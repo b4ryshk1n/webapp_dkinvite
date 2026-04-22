@@ -1,0 +1,388 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="scan-page">
+    <div id="flash-overlay" class="flash-overlay"></div>
+
+    <div class="scan-card">
+        <h2>Сканирование билета</h2>
+        <p class="muted">Камера запускается автоматически. Наведите устройство на QR-код.</p>
+
+        <div id="reader"></div>
+        <div id="scan-status" class="scan-status">Подготовка камеры...</div>
+    </div>
+
+    <div class="scan-card">
+        <h3>Ручной ввод</h3>
+        <form method="post" id="manual-form">
+            <input type="text" name="ticket_id" id="ticket_id" placeholder="ID билета или ссылка /ticket/..." autocomplete="off" required>
+            <button type="submit" class="btn btn-success">Погасить вручную</button>
+        </form>
+    </div>
+
+    <div class="scan-card" id="result-card" style="display:none;">
+        <h3>Результат</h3>
+        <div id="result-box" class="result-box"></div>
+        {% if session.get('role') == 'admin' %}
+        <div id="result-actions" class="result-actions" style="display:none;">
+            <a id="reset-ticket-btn" href="#" class="btn btn-reset">Сбросить погашение</a>
+        </div>
+        {% endif %}
+    </div>
+
+    {% if ticket %}
+    <div class="scan-card">
+        <h3>Последний результат</h3>
+        <p><strong>ФИО:</strong> {{ ticket.owner_name }}</p>
+        <p><strong>Мероприятие:</strong> {{ ticket.event }}</p>
+        <p><strong>Место:</strong> {{ ticket.seat }}</p>
+        <p><strong>Статус:</strong> {{ ticket.status_label if ticket.status_label else ticket.status }}</p>
+        <p><strong>ID:</strong> {{ ticket.id }}</p>
+
+        {% if session.get('role') == 'admin' and ticket.status == 'used' %}
+        <div class="result-actions">
+            <a href="/admin/ticket/{{ ticket.id }}/reset" class="btn btn-reset">Сбросить погашение</a>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
+<script src="https://unpkg.com/html5-qrcode"></script>
+<script>
+(function () {
+    const readerId = "reader";
+    const statusEl = document.getElementById("scan-status");
+    const resultCard = document.getElementById("result-card");
+    const resultBox = document.getElementById("result-box");
+    const resultActions = document.getElementById("result-actions");
+    const resetTicketBtn = document.getElementById("reset-ticket-btn");
+    const inputEl = document.getElementById("ticket_id");
+    const flashOverlay = document.getElementById("flash-overlay");
+
+    let html5QrCode = null;
+    let lastScanned = "";
+    let lastScannedAt = 0;
+    let busy = false;
+    let audioCtx = null;
+
+    function initAudio() {
+        try {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (!AudioCtx) return;
+            if (!audioCtx) audioCtx = new AudioCtx();
+            if (audioCtx.state === "suspended") audioCtx.resume();
+        } catch (e) {}
+    }
+
+    function vibrate(pattern) {
+        if (navigator.vibrate) navigator.vibrate(pattern);
+    }
+
+    function playTone(freq, duration) {
+        try {
+            if (!audioCtx) return;
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            oscillator.type = "sine";
+            oscillator.frequency.value = freq;
+            gainNode.gain.value = 0.08;
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            oscillator.start();
+            setTimeout(() => oscillator.stop(), duration);
+        } catch (e) {}
+    }
+
+    function flash(type) {
+        flashOverlay.className = "flash-overlay show " + type;
+        setTimeout(() => {
+            flashOverlay.className = "flash-overlay";
+        }, 320);
+    }
+
+    function successSignal() {
+        playTone(900, 110);
+        setTimeout(() => playTone(1200, 110), 130);
+        vibrate([80, 40, 80]);
+        flash("success");
+    }
+
+    function errorSignal() {
+        playTone(320, 220);
+        vibrate([180]);
+        flash("error");
+    }
+
+    function alreadyUsedSignal() {
+        playTone(520, 120);
+        setTimeout(() => playTone(520, 120), 150);
+        vibrate([60, 30, 60]);
+        flash("warning");
+    }
+
+    function setStatus(text, type) {
+        statusEl.textContent = text;
+        statusEl.className = "scan-status " + (type || "");
+    }
+
+    function setResetAction(ticketId, visible) {
+        if (!resultActions || !resetTicketBtn) return;
+        if (visible && ticketId) {
+            resetTicketBtn.href = "/admin/ticket/" + ticketId + "/reset";
+            resultActions.style.display = "flex";
+        } else {
+            resetTicketBtn.href = "#";
+            resultActions.style.display = "none";
+        }
+    }
+
+    function showResult(html, type) {
+        resultCard.style.display = "block";
+        resultBox.className = "result-box " + (type || "");
+        resultBox.innerHTML = html;
+    }
+
+    function extractTicketId(raw) {
+        raw = (raw || "").trim();
+        if (!raw) return "";
+        if (raw.includes("/ticket/")) {
+            return raw.replace(/\/+$/, "").split("/ticket/").pop().split("?")[0].trim();
+        }
+        return raw;
+    }
+
+    async function consumeTicket(rawValue) {
+        const ticketId = extractTicketId(rawValue);
+        if (!ticketId || busy) return;
+        busy = true;
+
+        try {
+            setStatus("Погашение билета...", "processing");
+
+            const response = await fetch("/scan/consume", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ticket_id: ticketId })
+            });
+
+            const data = await response.json();
+
+            if (data.ok) {
+                showResult(
+                    "<div class='big-title'>БИЛЕТ ПОГАШЕН</div>" +
+                    "<p><strong>ФИО:</strong> " + data.ticket.owner_name + "</p>" +
+                    "<p><strong>Мероприятие:</strong> " + data.ticket.event + "</p>" +
+                    "<p><strong>Место:</strong> " + data.ticket.seat + "</p>",
+                    "success"
+                );
+                setStatus("Билет успешно погашен", "success");
+                setResetAction(data.ticket.id, true);
+                successSignal();
+            } else if (data.error === "already_used") {
+                showResult(
+                    "<div class='big-title'>УЖЕ ПОГАШЕН</div>" +
+                    "<p>" + (data.message || "Этот билет уже был погашен") + "</p>",
+                    "warning"
+                );
+                setStatus(data.message || "Билет уже погашен", "warning");
+                setResetAction(ticketId, true);
+                alreadyUsedSignal();
+            } else if (data.error === "not_found") {
+                showResult(
+                    "<div class='big-title'>БИЛЕТ НЕ НАЙДЕН</div>" +
+                    "<p>" + (data.message || "Проверьте QR или ID") + "</p>",
+                    "error"
+                );
+                setStatus(data.message || "Билет не найден", "error");
+                setResetAction("", false);
+                errorSignal();
+            } else {
+                showResult(
+                    "<div class='big-title'>ОШИБКА</div><p>" + (data.message || "Неизвестная ошибка") + "</p>",
+                    "error"
+                );
+                setStatus(data.message || "Ошибка при погашении", "error");
+                setResetAction("", false);
+                errorSignal();
+            }
+        } catch (err) {
+            showResult("<div class='big-title'>ОШИБКА</div><p>Не удалось выполнить запрос</p>", "error");
+            setStatus("Ошибка соединения", "error");
+            setResetAction("", false);
+            errorSignal();
+        } finally {
+            busy = false;
+        }
+    }
+
+    function shouldSkipDuplicate(decodedText) {
+        const now = Date.now();
+        if (decodedText === lastScanned && (now - lastScannedAt) < 3000) return true;
+        lastScanned = decodedText;
+        lastScannedAt = now;
+        return false;
+    }
+
+    async function onScanSuccess(decodedText) {
+        if (shouldSkipDuplicate(decodedText)) return;
+        await consumeTicket(decodedText);
+    }
+
+    async function startCamera() {
+        initAudio();
+
+        try {
+            if (!html5QrCode) {
+                html5QrCode = new Html5Qrcode(readerId);
+            }
+
+            const cameras = await Html5Qrcode.getCameras();
+            if (!cameras || !cameras.length) {
+                setStatus("Камера не найдена", "error");
+                return;
+            }
+
+            await html5QrCode.start(
+                { facingMode: "environment" },
+                { fps: 10, qrbox: { width: 260, height: 260 } },
+                onScanSuccess
+            );
+
+            setStatus("Камера активна. Наведите на QR", "success");
+        } catch (err) {
+            setStatus("Не удалось запустить камеру", "error");
+        }
+    }
+
+    document.addEventListener("click", initAudio, { once: true });
+    document.addEventListener("touchstart", initAudio, { once: true });
+
+    window.addEventListener("load", () => {
+        inputEl.focus();
+        startCamera();
+    });
+})();
+</script>
+
+<style>
+.scan-page {
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.scan-card {
+    background: #fff;
+    border-radius: 14px;
+    padding: 16px;
+    margin-bottom: 16px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+}
+
+#reader {
+    width: 100%;
+    max-width: 420px;
+    margin: 16px auto;
+}
+
+.scan-status {
+    margin-top: 12px;
+    padding: 12px;
+    border-radius: 10px;
+    background: #eef1f4;
+}
+
+.scan-status.success {
+    background: #e8f7ec;
+    color: #176b2c;
+}
+
+.scan-status.warning {
+    background: #fff6e5;
+    color: #9a6700;
+}
+
+.scan-status.error {
+    background: #fdeaea;
+    color: #a11c1c;
+}
+
+.scan-status.processing {
+    background: #eef3ff;
+    color: #1d4ed8;
+}
+
+.result-box {
+    padding: 16px;
+    border-radius: 12px;
+}
+
+.result-box.success {
+    background: #e8f7ec;
+    color: #176b2c;
+}
+
+.result-box.warning {
+    background: #fff6e5;
+    color: #9a6700;
+}
+
+.result-box.error {
+    background: #fdeaea;
+    color: #a11c1c;
+}
+
+.result-actions {
+    margin-top: 14px;
+    display: flex;
+    justify-content: center;
+}
+
+.btn-reset {
+    background: #7f8c8d;
+    color: #fff;
+    text-decoration: none;
+}
+
+.big-title {
+    font-size: 28px;
+    font-weight: 800;
+    margin-bottom: 10px;
+}
+
+#manual-form {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+#manual-form input {
+    flex: 1 1 320px;
+    padding: 12px;
+    border: 1px solid #cfd6dd;
+    border-radius: 10px;
+    font-size: 16px;
+}
+
+.muted {
+    color: #667085;
+}
+
+.flash-overlay {
+    position: fixed;
+    inset: 0;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 9999;
+    transition: opacity 0.2s ease;
+}
+
+.flash-overlay.show {
+    opacity: 0.28;
+}
+
+.flash-overlay.success { background: #16a34a; }
+.flash-overlay.warning { background: #f59e0b; }
+.flash-overlay.error { background: #dc2626; }
+</style>
+{% endblock %}

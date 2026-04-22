@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div style="background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-top: 20px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 15px; margin-bottom: 15px;">
+        <h2 style="margin: 0; color: #1c1e21;">Журнал действий</h2>
+        <a href="/admin" class="btn" style="background: #e2e8f0; color: #1c1e21; font-size: 14px;">Назад</a>
+    </div>
+    
+    <div style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 14px;">
+            <thead>
+                <tr style="background: #f8f9fa; border-bottom: 2px solid #e2e8f0;">
+                    <th style="padding: 12px; color: #475569;">Дата/Время</th>
+                    <th style="padding: 12px; color: #475569;">Пользователь</th>
+                    <th style="padding: 12px; color: #475569;">Действие</th>
+                    <th style="padding: 12px; color: #475569;">Детали</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in logs %}
+                <tr style="border-bottom: 1px solid #eee; transition: background 0.2s;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='transparent'">
+                    <td style="padding: 12px; color: #64748b; font-size: 12px; white-space: nowrap;">{{ log.timestamp }}</td>
+                    <td style="padding: 12px;">
+                        <span style="background: #e0e7ff; color: #4338ca; padding: 4px 8px; border-radius: 6px; font-weight: 600; font-size: 12px;">
+                            {{ log.username }}
+                        </span>
+                    </td>
+                    <td style="padding: 12px; color: #1e293b;"><strong>{{ log.action }}</strong></td>
+                    <td style="padding: 12px; color: #475569;">{{ log.details }}</td>
+                </tr>
+                {% endfor %}
+                {% if not logs %}
+                <tr>
+                    <td colspan="4" style="padding: 30px; text-align: center; color: #94a3b8; font-style: italic;">Журнал пока пуст</td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

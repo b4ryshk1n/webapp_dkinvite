@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block content %}
+<div style="display: flex; justify-content: center; align-items: center; min-height: 80vh;">
+    <div style="background: #fff; padding: 40px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); width: 100%; max-width: 350px; text-align: center; border: 1px solid #e2e8f0;">
+        <h2 style="color: #2c3e50; margin-top: 0; margin-bottom: 25px;">Вход в систему</h2>
+        
+        {% with messages = get_flashed_messages() %}
+          {% if messages %}
+            <div style="background: #fdedec; color: #e74c3c; padding: 10px; border-radius: 8px; margin-bottom: 20px; font-weight: bold; font-size: 14px;">
+                {{ messages[0] }}
+            </div>
+          {% endif %}
+        {% endwith %}
+        
+        <form method="POST" style="display: flex; flex-direction: column; gap: 15px;">
+            <input type="text" name="username" placeholder="Логин" required 
+                   style="padding: 14px; border: 2px solid #ecf0f1; border-radius: 8px; font-size: 16px; outline: none; transition: border 0.2s;"
+                   onfocus="this.style.borderColor='#3498db'" onblur="this.style.borderColor='#ecf0f1'">
+            
+            <input type="password" name="password" placeholder="Пароль" required 
+                   style="padding: 14px; border: 2px solid #ecf0f1; border-radius: 8px; font-size: 16px; outline: none; transition: border 0.2s;"
+                   onfocus="this.style.borderColor='#3498db'" onblur="this.style.borderColor='#ecf0f1'">
+            
+            <button type="submit" style="margin-top: 10px; padding: 16px; background: #3498db; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s; box-shadow: 0 4px 10px rgba(52, 152, 219, 0.3);">
+                ВОЙТИ
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}

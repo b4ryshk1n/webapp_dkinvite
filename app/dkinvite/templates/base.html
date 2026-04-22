@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>{% block title %}Dkinvite v2{% endblock %}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: Arial, sans-serif; margin: 24px; background: #f5f5f5; color: #222; }
+    .wrap { max-width: 1200px; margin: 0 auto; }
+    .card { background: #fff; border: 1px solid #ddd; border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+    .row { display: flex; gap: 16px; flex-wrap: wrap; }
+    .col { flex: 1 1 300px; }
+    input, select, button { width: 100%; padding: 10px; margin-top: 8px; box-sizing: border-box; }
+    button { cursor: pointer; }
+    table { width: 100%; border-collapse: collapse; background: #fff; }
+    th, td { border: 1px solid #ddd; padding: 8px; vertical-align: top; }
+    th { background: #eee; text-align: left; }
+    .success { color: #0a6b2d; }
+    .error { color: #a10000; }
+    .topnav a { margin-right: 12px; }
+    .mono { font-family: monospace; word-break: break-all; }
+    img.qr { max-width: 280px; height: auto; }
+  </style>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='icons/favicon.ico') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <meta name="theme-color" content="#007aff">
+</head>
+<body>
+  <div class="wrap">
+    <div class="topnav card">
+      <a href="{{ url_for('web.admin') }}">Админ</a>
+      <a href="{{ url_for('web.scan') }}">Сканирование</a>
+      <a href="{{ url_for('web.logout') }}">Выход</a>
+      {% if current_user %}
+        <span>Пользователь: <strong>{{ current_user.username }}</strong></span>
+      {% endif %}
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="card">
+          {% for category, message in messages %}
+            <div class="{{ category }}">{{ message }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+  </div>
+</body>
+</html>

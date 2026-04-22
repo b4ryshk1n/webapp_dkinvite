@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}Админ-панель{% endblock %}
+{% block content %}
+
+<div class="row">
+  <div class="col">
+    <div class="card">
+      <h2>Создать мероприятие</h2>
+      <form method="post" action="{{ url_for('web.create_event') }}">
+        <label>Название</label>
+        <input type="text" name="name" required>
+        <label>Дата</label>
+        <input type="date" name="event_date">
+        <button type="submit">Создать мероприятие</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="card">
+      <h2>Создать билет</h2>
+      <form method="post" action="{{ url_for('web.create_ticket') }}">
+        <label>Мероприятие</label>
+        <select name="event_id" required>
+          <option value="">Выберите мероприятие</option>
+          {% for event in events %}
+            <option value="{{ event.id }}">{{ event.name }}{% if event.event_date %} — {{ event.event_date }}{% endif %}</option>
+          {% endfor %}
+        </select>
+        <label>ФИО</label>
+        <input type="text" name="owner_name" required>
+        <label>Место</label>
+        <input type="text" name="seat" required>
+        <button type="submit">Создать билет</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Фильтр билетов</h2>
+  <form method="get" action="{{ url_for('web.admin') }}">
+    <div class="row">
+      <div class="col">
+        <label>Мероприятие</label>
+        <select name="event_id">
+          <option value="">Все</option>
+          {% for event in events %}
+            <option value="{{ event.id }}" {% if selected_event_id == event.id %}selected{% endif %}>
+              {{ event.name }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col">
+        <label>Статус</label>
+        <select name="status">
+          <option value="">Все</option>
+          <option value="active" {% if selected_status == 'active' %}selected{% endif %}>active</option>
+          <option value="used" {% if selected_status == 'used' %}selected{% endif %}>used</option>
+          <option value="cancelled" {% if selected_status == 'cancelled' %}selected{% endif %}>cancelled</option>
+          <option value="blocked" {% if selected_status == 'blocked' %}selected{% endif %}>blocked</option>
+        </select>
+      </div>
+      <div class="col">
+        <label>&nbsp;</label>
+        <button type="submit">Применить</button>
+      </div>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Билеты</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Мероприятие</th>
+        <th>ФИО</th>
+        <th>Место</th>
+        <th>Статус</th>
+        <th>QR</th>
+        <th>Действия</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for ticket in tickets %}
+      <tr>
+        <td class="mono"><a href="{{ url_for('web.ticket_detail', ticket_id=ticket.id) }}">{{ ticket.id }}</a></td>
+        <td>{{ ticket.event.name if ticket.event else '—' }}</td>
+        <td>{{ ticket.owner_name }}</td>
+        <td>{{ ticket.seat }}</td>
+        <td>{{ ticket.status.value if ticket.status.value else ticket.status }}</td>
+        <td>
+          {% if ticket.qr_path %}
+            <a href="{{ url_for('static', filename=ticket.qr_path) }}" target="_blank">Открыть QR</a>
+          {% else %}
+            —
+          {% endif %}
+        </td>
+        <td>
+          <form method="post" action="{{ url_for('web.use_ticket', ticket_id=ticket.id) }}" style="margin-bottom:8px;">
+            <button type="submit">Погасить</button>
+          </form>
+          <form method="post" action="{{ url_for('web.reset_ticket', ticket_id=ticket.id) }}" style="margin-bottom:8px;">
+            <button type="submit">Сбросить</button>
+          </form>
+          {% if current_user.role.value == 'admin' %}
+          <form method="post" action="{{ url_for('web.delete_ticket', ticket_id=ticket.id) }}">
+            <button type="submit">Удалить</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="7">Билетов пока нет</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% endblock %}

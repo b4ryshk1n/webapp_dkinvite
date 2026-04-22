@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ваши билеты</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        body { background: #f4f7f6; padding-bottom: 50px; }
+        .group-header { padding: 25px; text-align: center; }
+        .tickets-container { display: flex; flex-direction: column; gap: 20px; padding: 0 15px; }
+        .ticket-card { background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.08); position: relative; }
+        .ticket-status-badge { position: absolute; top: 15px; right: 15px; padding: 5px 12px; border-radius: 20px; font-size: 10px; font-weight: bold; text-transform: uppercase; }
+        .status-active { background: #e3f9eb; color: #27ae60; }
+        .status-used { background: #fee2e2; color: #ef4444; }
+        .personalize-box { padding: 20px; background: #f9fafb; border-top: 1px dashed #e5e7eb; text-align: center; }
+        .input-mini { width: 80%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 10px; }
+        .btn-mini { background: #007bff; color: white; border: none; padding: 8px 15px; border-radius: 8px; cursor: pointer; }
+        .share-btn { margin-top: 10px; background: none; border: 1px solid #007bff; color: #007bff; padding: 5px 10px; border-radius: 5px; font-size: 12px; }
+    </small></style>
+</head>
+<body>
+    <div class="group-header">
+        <h2 style="margin:0;">Приглашения для</h2>
+        <h1 style="color:#007bff; margin:5px 0;">{{ tickets[0].name }}</h1>
+        <p style="color:#666;">Всего билетов: {{ tickets|length }}</p>
+    </div>
+
+    <div class="tickets-container">
+        {% for t in tickets %}
+        <div class="ticket-card" id="card-{{ t.id }}">
+            <div class="ticket-status-badge status-{{ t.status }}">
+                {{ 'Действителен' if t.status == 'active' else 'Использован' }}
+            </div>
+            
+            <div style="padding:20px;">
+                <div style="font-size:12px; color:#888; text-transform:uppercase;">{{ t.event }}</div>
+                <div style="font-size:20px; font-weight:bold; margin:5px 0;" id="name-display-{{ t.id }}">
+                    {{ t.guest_name if t.guest_name else t.name }}
+                    {% if t.guest_name %}<br><small style="font-weight:normal; color:#888; font-size:14px;">(Пригласил: {{ t.name }})</small>{% endif %}
+                </div>
+                <div style="background:#f0f4f8; padding:10px; border-radius:10px; display:inline-block; font-weight:bold; color:#007bff;">
+                    {{ t.seat }}
+                </div>
+            </div>
+
+            <div style="text-align:center; padding-bottom:20px;">
+                <img src="{{ url_for('static', filename='qrs/' + t.id + '.png') }}" style="width:180px; filter: {{ 'grayscale(1) opacity(0.3)' if t.status == 'used' else 'none' }};">
+            </div>
+
+            {% if not t.guest_name %}
+            <div class="personalize-box" id="input-area-{{ t.id }}">
+                <p style="font-size:13px; margin-bottom:10px; color:#444;">Кто пойдет на это место?</p>
+                <input type="text" id="input-{{ t.id }}" class="input-mini" placeholder="Введите имя гостя">
+                <button onclick="saveName('{{ t.id }}')" class="btn-mini">Вписать</button>
+            </div>
+            {% endif %}
+
+            <div style="text-align:center; padding-bottom:15px;">
+                <button class="share-btn" onclick="shareTicket('{{ t.id }}', '{{ t.seat }}')">📱 Переслать этот билет другу</button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <script>
+    function saveName(tid) {
+        const val = document.getElementById('input-' + tid).value;
+        if(!val) return alert("Введите имя");
+
+        fetch('/api/personalize/' + tid, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({guest_name: val})
+        }).then(res => res.json()).then(data => {
+            if(data.success) location.reload();
+            else alert(data.error);
+        });
+    }
+
+    function shareTicket(tid, seat) {
+        const url = window.location.origin + '/ticket/' + tid;
+        if (navigator.share) {
+            navigator.share({ title: 'Твой билет в ДК', text: 'Билет на ' + seat, url: url });
+        } else {
+            prompt("Скопируйте ссылку на билет:", url);
+        }
+    }
+    </script>
+</body>
+</html>

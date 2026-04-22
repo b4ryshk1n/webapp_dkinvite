@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block content %}
+<div style="max-width:700px;margin:40px auto;background:#fff;border-radius:14px;padding:24px;box-shadow:0 2px 12px rgba(0,0,0,0.08);text-align:center;">
+    <h1 style="margin:0 0 12px;font-size:32px;">404</h1>
+    <p style="font-size:18px;font-weight:700;margin:0 0 10px;">Страница не найдена</p>
+    <p style="color:#667085;margin:0 0 20px;">Проверьте адрес или вернитесь назад.</p>
+
+    {% if session.get('logged_in') and session.get('role') == 'admin' %}
+    <a href="/admin" class="btn btn-success">Вернуться в админ-панель</a>
+    {% elif session.get('logged_in') and session.get('role') == 'controller' %}
+    <a href="/scan" class="btn btn-success">Перейти к сканеру</a>
+    {% else %}
+    <a href="/login" class="btn btn-success">Перейти ко входу</a>
+    {% endif %}
+</div>
+{% endblock %}

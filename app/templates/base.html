@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <title>Билеты ДК Кирова</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            background: #f0f2f5;
+            color: #1c1e21;
+        }
+
+        .mobile-nav {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            height: 70px;
+            background: #2c3e50;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            padding: 0 10px;
+            z-index: 2000;
+            box-shadow: 0 -2px 20px rgba(0,0,0,0.12);
+            border-top: 1px solid #1a252f;
+            overflow-x: auto;
+            white-space: nowrap;
+        }
+
+        .nav-link {
+            text-decoration: none;
+            color: #bdc3c7;
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            min-width: 62px;
+            flex: 1 0 auto;
+        }
+
+        .nav-link i {
+            font-size: 18px;
+        }
+
+        .nav-link span {
+            font-size: 11px;
+            line-height: 1.1;
+        }
+
+        .nav-link.active {
+            color: #ffffff;
+        }
+
+        .main-wrapper {
+            padding: 15px 15px 90px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .btn {
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            text-decoration: none;
+            display: inline-block;
+            transition: 0.2s;
+        }
+
+        .btn:active {
+            transform: scale(0.96);
+        }
+
+        .btn-success {
+            background: #34c759;
+            color: white;
+        }
+
+        .btn-danger {
+            background: #ff3b30;
+            color: white;
+        }
+
+        @media (min-width: 900px) {
+            .mobile-nav {
+                top: 0;
+                bottom: auto;
+                height: 60px;
+                justify-content: flex-start;
+                gap: 18px;
+                padding: 0 16px;
+                box-shadow: 0 2px 20px rgba(0,0,0,0.12);
+                border-top: none;
+                border-bottom: 1px solid #1a252f;
+            }
+
+            .nav-link {
+                flex-direction: row;
+                gap: 8px;
+                min-width: auto;
+                flex: 0 0 auto;
+                font-size: 14px;
+            }
+
+            .nav-link span {
+                font-size: 14px;
+            }
+
+            .main-wrapper {
+                padding: 75px 15px 15px;
+            }
+        }
+    </style>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='icons/favicon.ico') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <meta name="theme-color" content="#007aff">
+</head>
+<body class="{% if session.get('logged_in') %}has-auth{% endif %}">
+
+    {% if session.get('logged_in') %}
+    <nav class="mobile-nav">
+        {% if session.get('role') == 'admin' %}
+        <a href="/admin" class="nav-link {% if request.path == '/admin' %}active{% endif %}">
+            <i class="fa-solid fa-couch"></i><span>Схема</span>
+        </a>
+        <a href="/admin/events" class="nav-link {% if request.path == '/admin/events' %}active{% endif %}">
+            <i class="fa-solid fa-calendar-days"></i><span>События</span>
+        </a>
+        <a href="/admin/tickets" class="nav-link {% if request.path == '/admin/tickets' %}active{% endif %}">
+            <i class="fa-solid fa-ticket"></i><span>Билеты</span>
+        </a>
+        <a href="/scan" class="nav-link {% if request.path == '/scan' %}active{% endif %}">
+            <i class="fa-solid fa-qrcode"></i><span>Сканер</span>
+        </a>
+        <a href="/admin/logs" class="nav-link {% if request.path == '/admin/logs' %}active{% endif %}">
+            <i class="fa-solid fa-clock-rotate-left"></i><span>Журнал</span>
+        </a>
+        {% elif session.get('role') == 'controller' %}
+        <a href="/scan" class="nav-link {% if request.path == '/scan' %}active{% endif %}">
+            <i class="fa-solid fa-qrcode"></i><span>Сканер</span>
+        </a>
+        {% endif %}
+
+        <a href="/logout" class="nav-link" style="color:#ff3b30;">
+            <i class="fa-solid fa-right-from-bracket"></i><span>Выход</span>
+        </a>
+    </nav>
+    {% endif %}
+
+    <div class="main-wrapper">
+        <div class="container">
+            {% block content %}{% endblock %}
+        </div>
+    </div>
+
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/static/sw.js');
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+services:
+  web:
+    build: .
+    container_name: dkinvite_app
+    restart: always
+    ports:
+      - "5005:5000"
+    volumes:
+      - ./app/instance:/app/instance
+      - ./app/static/qrs:/app/static/qrs
+    env_file:
+      - .env.docker
+    environment:
+      - TZ=Europe/Moscow

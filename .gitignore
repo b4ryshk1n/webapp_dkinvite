@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Env
+.env
+.env.*
+!.env.example
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Databases
+*.sqlite
+*.sqlite3
+
+# Runtime data
+app/instance/*
+!app/instance/.gitkeep
+
+# Generated QR files
+app/static/qrs/*
+!app/static/qrs/.gitkeep
+
+# Logs / backups
+*.log
+backups/
+*.tar
+*.tar.gz
+*.zip

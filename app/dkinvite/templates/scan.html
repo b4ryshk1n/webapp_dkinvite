@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Сканирование{% endblock %}
+{% block content %}
+
+<div class="card">
+  <h2>Погашение билета</h2>
+  <form method="post">
+    <label>ID билета</label>
+    <input type="text" name="ticket_id" required>
+    <button type="submit">Погасить билет</button>
+  </form>
+</div>
+
+{% if ticket %}
+<div class="card">
+  <h2>Результат</h2>
+  <p><strong>ID:</strong> <span class="mono">{{ ticket.id }}</span></p>
+  <p><strong>Мероприятие:</strong> {{ ticket.event.name if ticket.event else '—' }}</p>
+  <p><strong>ФИО:</strong> {{ ticket.owner_name }}</p>
+  <p><strong>Место:</strong> {{ ticket.seat }}</p>
+  <p><strong>Статус:</strong> {{ ticket.status.value if ticket.status.value else ticket.status }}</p>
+  <p><strong>Время погашения:</strong> {{ ticket.used_at if ticket.used_at else '—' }}</p>
+</div>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>Билет</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: Arial, sans-serif; background: #f5f5f5; margin: 0; }
+    .box { max-width: 720px; margin: 30px auto; background: #fff; border: 1px solid #ddd; border-radius: 10px; padding: 24px; }
+    .mono { font-family: monospace; word-break: break-all; }
+    img { max-width: 320px; height: auto; display: block; margin-top: 16px; }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h1>{{ ticket.event.name if ticket.event else 'Пригласительный билет' }}</h1>
+    <p><strong>ФИО:</strong> {{ ticket.owner_name }}</p>
+    <p><strong>Место:</strong> {{ ticket.seat }}</p>
+    <p><strong>Статус:</strong> {{ ticket.status.value if ticket.status.value else ticket.status }}</p>
+    {% if ticket.event and ticket.event.event_date %}
+      <p><strong>Дата мероприятия:</strong> {{ ticket.event.event_date }}</p>
+    {% endif %}
+    <p><strong>ID билета:</strong> <span class="mono">{{ ticket.id }}</span></p>
+
+    {% if ticket.qr_path %}
+      <img src="{{ url_for('static', filename=ticket.qr_path) }}" alt="QR">
+    {% endif %}
+  </div>
+</body>
+</html>

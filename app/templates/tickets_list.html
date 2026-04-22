@@ -1,0 +1,794 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+    .admin-panel { background: #fff; padding: 15px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-top: 10px; }
+    .table-container { overflow-x: auto; margin-top: 15px; }
+    table { width: 100%; border-collapse: collapse; min-width: 600px; }
+    th, td { padding: 15px; text-align: left; border-bottom: 1px solid #f0f2f5; }
+    th { background: #fafafa; color: #8e8e93; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; }
+
+    .status-tag { padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: bold; display: inline-flex; align-items: center; }
+    .status-active { background: #e3f9eb; color: #24b05d; }
+    .status-used { background: #fff1f0; color: #ff4d4f; }
+    .status-sent { background: #eef2ff; color: #3949ab; margin-top: 8px; }
+
+    .delivery-meta {
+        margin-top: 8px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+
+    .delivery-meta[hidden] {
+        display: none !important;
+    }
+
+    .delivery-time {
+        font-size: 11px;
+        color: #8e8e93;
+        font-weight: 600;
+    }
+
+    .btn-circle {
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        text-decoration: none;
+        color: white;
+        transition: 0.2s;
+        border: none;
+        cursor: pointer;
+    }
+
+    .header-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .bulk-share-count {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 20px;
+        height: 20px;
+        padding: 0 6px;
+        border-radius: 999px;
+        background: rgba(255,255,255,0.22);
+        font-size: 12px;
+        font-weight: 700;
+    }
+
+    .actions-cell {
+        text-align: right;
+        white-space: nowrap;
+    }
+
+    .action-buttons {
+        display: inline-flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 8px;
+    }
+
+    .ticket-select-wrap {
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: #eef2f7;
+        cursor: pointer;
+        transition: 0.2s;
+    }
+
+    .ticket-select-wrap:hover {
+        background: #e2e8f0;
+    }
+
+    .ticket-select {
+        width: 16px;
+        height: 16px;
+        margin: 0;
+        cursor: pointer;
+        accent-color: #007aff;
+    }
+
+    .search-loading {
+        opacity: 0.65;
+        transition: opacity 0.2s;
+    }
+
+    @media (max-width: 768px) {
+        .table-container { overflow-x: hidden; }
+        table { min-width: 100%; display: block; }
+        thead { display: none; }
+        tbody { display: block; }
+
+        tr {
+            display: block;
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            margin-bottom: 15px;
+            padding: 10px 15px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        }
+
+        td {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px dashed #f0f2f5;
+            text-align: right;
+        }
+
+        td:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+            padding-top: 15px;
+        }
+
+        td::before {
+            content: attr(data-label);
+            font-size: 11px;
+            color: #8e8e93;
+            font-weight: bold;
+            text-transform: uppercase;
+            text-align: left;
+            margin-right: 15px;
+        }
+
+        td > div { text-align: right; }
+
+        .actions-cell {
+            justify-content: space-between !important;
+        }
+
+        .action-buttons {
+            flex-wrap: nowrap;
+        }
+
+        .header-actions {
+            width: 100%;
+        }
+
+        .delivery-meta {
+            align-items: flex-end;
+        }
+    }
+</style>
+
+<div class="admin-panel">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 20px;">
+        <form id="ticket-search-form" method="GET" style="display:flex; flex-wrap:wrap; gap:10px; flex: 1;">
+            <input
+                id="ticket-search-input"
+                type="text"
+                name="q"
+                placeholder="Поиск по имени..."
+                value="{{ search_q }}"
+                autocomplete="off"
+                style="flex:1; min-width:150px; padding:12px; border-radius:10px; border:1px solid #e2e8f0;"
+            >
+            <select id="ticket-event-filter" name="event" style="flex:1; min-width:150px; padding:12px; border-radius:10px; border:2px solid #007aff; background:#fff;">
+                <option value="">Все мероприятия</option>
+                {% for ev in events %}
+                <option value="{{ ev.name }}" {% if current_event == ev.name %}selected{% endif %}>{{ ev.name }}</option>
+                {% endfor %}
+            </select>
+        </form>
+
+        {% if session.get('role') == 'admin' %}
+        <div class="header-actions">
+            <button
+                id="bulk-share-btn"
+                type="button"
+                class="btn"
+                hidden
+                style="background:#34c759; color:white; padding:12px 20px; border-radius:10px; font-weight:bold; display:inline-flex; align-items:center; gap:8px;"
+            >
+                <i class="fa-solid fa-share-nodes"></i>
+                Отправить выбранные
+                <span id="bulk-share-count" class="bulk-share-count">0</span>
+            </button>
+
+            <a
+                id="tickets-export-link"
+                data-base-path="{{ url_for('web.export_tickets') }}"
+                href="{{ url_for('web.export_tickets', q=search_q, event=current_event) }}"
+                class="btn"
+                style="background:#10b981; color:white; padding:12px 20px; border-radius:10px; text-decoration:none; font-weight:bold; display:inline-flex; align-items:center; gap:8px;"
+            >
+                <i class="fa-solid fa-file-excel"></i> Выгрузить (Excel)
+            </a>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Гость / Место</th>
+                    <th>Событие</th>
+                    <th>Статус</th>
+                    <th style="text-align:right;">Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in tickets %}
+                <tr data-ticket-id="{{ t.id }}">
+                    <td data-label="Билет">
+                        <div>
+                            <div style="font-weight:bold;">{{ t.name }}</div>
+                            <div style="color:#e67e22; font-size:12px; font-weight:bold;">{{ t.seat }}</div>
+                        </div>
+                    </td>
+                    <td data-label="Событие">
+                        <div>
+                            <div>{{ t.event }}</div>
+                            <div style="color:#8e8e93; font-size:11px;">
+                                {{ t.date }}{% if t.time %} {{ t.time }}{% endif %}
+                            </div>
+                        </div>
+                    </td>
+                    <td data-label="Статус" class="status-cell">
+                        {% if t.status == 'active' %}
+                        <span class="status-tag status-active">АКТИВЕН</span>
+                        {% else %}
+                        <span class="status-tag status-used">ИСПОЛЬЗОВАН</span>
+                        {% endif %}
+
+                        <div class="delivery-meta" {% if not t.sent_at %}hidden{% endif %}>
+                            <span class="status-tag status-sent">ОТПРАВЛЕН</span>
+                            <span class="delivery-time">{{ t.sent_at or '' }}</span>
+                        </div>
+                    </td>
+                    <td data-label="Действия" class="actions-cell">
+                        <div class="action-buttons">
+                            <a
+                                href="{{ url_for('web.ticket', ticket_id=t.id) }}"
+                                class="btn-circle"
+                                style="background:#34495e;"
+                                title="Открыть"
+                            >
+                                <i class="fa-solid fa-eye"></i>
+                            </a>
+
+                            {% if session.get('role') == 'admin' %}
+                            <label class="ticket-select-wrap" title="Выбрать для отправки">
+                                <input
+                                    type="checkbox"
+                                    class="ticket-select bulk-ticket-checkbox"
+                                    data-ticket-id="{{ t.id }}"
+                                    data-url="{{ url_for('web.ticket', ticket_id=t.id, _external=True) }}"
+                                    data-event="{{ t.event|e }}"
+                                    data-name="{{ t.name|e }}"
+                                    data-seat="{{ t.seat|e }}"
+                                >
+                            </label>
+
+                            <button
+                                type="button"
+                                class="btn-circle share-ticket-btn"
+                                style="background:#34c759;"
+                                title="Поделиться"
+                                data-ticket-id="{{ t.id }}"
+                                data-url="{{ url_for('web.ticket', ticket_id=t.id, _external=True) }}"
+                                data-event="{{ t.event|e }}"
+                                data-seat="{{ t.seat|e }}"
+                            >
+                                <i class="fa-solid fa-share-nodes"></i>
+                            </button>
+
+                            <a
+                                href="/admin/delete_ticket/{{ t.id }}"
+                                class="btn-circle"
+                                style="background:#ff3b30;"
+                                title="Удалить"
+                            >
+                                <i class="fa-solid fa-trash-can"></i>
+                            </a>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="4" style="text-align:center; color:#8e8e93;">Билеты не найдены</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+let ticketStatusRefreshTimer = null;
+let ticketSearchTimer = null;
+let ticketSearchAbortController = null;
+
+function markButtonDone(btn, defaultIconClass) {
+    if (!btn) return;
+    const icon = btn.querySelector('i');
+    if (!icon) return;
+
+    icon.className = 'fa-solid fa-check';
+    setTimeout(() => {
+        icon.className = defaultIconClass;
+    }, 2000);
+}
+
+function isDesktopDevice() {
+    return window.matchMedia('(min-width: 769px)').matches;
+}
+
+async function copyTextFallback(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        return true;
+    }
+
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.setAttribute('readonly', '');
+    textarea.style.position = 'fixed';
+    textarea.style.left = '-9999px';
+    document.body.appendChild(textarea);
+    textarea.select();
+
+    try {
+        const ok = document.execCommand('copy');
+        document.body.removeChild(textarea);
+        return ok;
+    } catch (e) {
+        document.body.removeChild(textarea);
+        return false;
+    }
+}
+
+function buildSingleShareText(eventName, seat, url) {
+    return [
+        'Уважаемый гость!',
+        '',
+        `Направляем вам электронный пригласительный билет на мероприятие "${eventName}".`,
+        seat ? `Место: ${seat}` : '',
+        '',
+        '1. Откройте ссылку перед входом на мероприятие.',
+        '2. Предъявите QR-код контролёру при входе.',
+        '3. Не передавайте ссылку третьим лицам.',
+        '',
+        `Ссылка на билет: ${url}`
+    ].filter(Boolean).join('\n');
+}
+
+async function shareOrCopy(payload, btn, defaultIconClass) {
+    const textForCopy = payload.text || '';
+
+    if (!isDesktopDevice() && navigator.share) {
+        try {
+            await navigator.share({
+                title: payload.title,
+                text: payload.text
+            });
+            return true;
+        } catch (error) {
+            console.error(error);
+        }
+    }
+
+    const copied = await copyTextFallback(textForCopy);
+    if (copied) {
+        markButtonDone(btn, defaultIconClass);
+        return true;
+    }
+
+    alert('Не удалось автоматически скопировать текст.');
+    return false;
+}
+
+function updateDeliveryBadge(ticketId, sentAt) {
+    const row = document.querySelector(`tr[data-ticket-id="${ticketId}"]`);
+    if (!row) return;
+
+    const meta = row.querySelector('.delivery-meta');
+    const time = row.querySelector('.delivery-time');
+
+    if (!meta || !time) return;
+
+    if (sentAt && String(sentAt).trim()) {
+        meta.hidden = false;
+        time.textContent = String(sentAt).trim();
+    } else {
+        meta.hidden = true;
+        time.textContent = '';
+    }
+}
+
+async function markTicketsSent(ticketIds) {
+    const ids = [...new Set((ticketIds || []).map((item) => String(item).trim()).filter(Boolean))];
+    if (!ids.length) return;
+
+    try {
+        const response = await fetch('/admin/tickets/mark-sent', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({ ticket_ids: ids })
+        });
+
+        if (!response.ok) return;
+
+        const data = await response.json();
+        const items = Array.isArray(data.items) ? data.items : [];
+
+        items.forEach((item) => {
+            updateDeliveryBadge(item.id, item.sent_at || '');
+        });
+    } catch (error) {
+        console.error('Ошибка пометки отправки билета:', error);
+    }
+}
+
+async function syncVisibleSentMarks() {
+    const ids = Array.from(document.querySelectorAll('tr[data-ticket-id]'))
+        .map((row) => row.dataset.ticketId)
+        .filter(Boolean);
+
+    if (!ids.length) return;
+
+    const url = new URL('/admin/tickets/sent-state', window.location.origin);
+    ids.forEach((id) => url.searchParams.append('ids', id));
+
+    try {
+        const response = await fetch(url.toString(), {
+            method: 'GET',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Cache-Control': 'no-cache'
+            },
+            cache: 'no-store'
+        });
+
+        if (!response.ok) return;
+
+        const data = await response.json();
+        const items = Array.isArray(data.items) ? data.items : [];
+
+        items.forEach((item) => {
+            updateDeliveryBadge(item.id, item.sent_at || '');
+        });
+    } catch (error) {
+        console.error('Ошибка загрузки пометок отправки:', error);
+    }
+}
+
+async function shareSingleTicket(btn) {
+    const ticketId = btn.dataset.ticketId;
+    const url = btn.dataset.url;
+    const eventName = btn.dataset.event || 'Мероприятие';
+    const seat = btn.dataset.seat || '';
+    const text = buildSingleShareText(eventName, seat, url);
+
+    const ok = await shareOrCopy({
+        title: 'Электронный пригласительный билет',
+        text: text
+    }, btn, 'fa-solid fa-share-nodes');
+
+    if (ok && ticketId) {
+        await markTicketsSent([ticketId]);
+    }
+}
+
+function getSelectedTickets() {
+    return Array.from(document.querySelectorAll('.bulk-ticket-checkbox:checked')).map((checkbox) => ({
+        ticketId: checkbox.dataset.ticketId,
+        url: checkbox.dataset.url,
+        event: checkbox.dataset.event || 'Мероприятие',
+        name: checkbox.dataset.name || 'Гость',
+        seat: checkbox.dataset.seat || '—'
+    }));
+}
+
+function updateBulkShareState() {
+    const bulkButton = document.getElementById('bulk-share-btn');
+    const bulkCount = document.getElementById('bulk-share-count');
+
+    if (!bulkButton || !bulkCount) return;
+
+    const selected = getSelectedTickets();
+    bulkCount.textContent = selected.length;
+    bulkButton.hidden = selected.length === 0;
+}
+
+function buildBulkShareText(items) {
+    const intro = [
+        'Уважаемый гость!',
+        '',
+        'Направляем вам электронные пригласительные билеты.',
+        '',
+        '1. Откройте нужную ссылку перед входом на мероприятие.',
+        '2. Предъявите QR-код контролёру при входе.',
+        '3. Не передавайте ссылки третьим лицам.',
+        '',
+        'Список билетов:',
+        ''
+    ].join('\n');
+
+    const ticketsText = items.map((item, index) => {
+        return `${index + 1}. ${item.event}\n${item.name} — ${item.seat}\n${item.url}`;
+    }).join('\n\n');
+
+    return intro + ticketsText;
+}
+
+async function shareSelectedTickets() {
+    const bulkButton = document.getElementById('bulk-share-btn');
+    const selected = getSelectedTickets();
+
+    if (!selected.length) return;
+
+    const text = buildBulkShareText(selected);
+
+    const ok = await shareOrCopy({
+        title: 'Электронные пригласительные билеты',
+        text: text
+    }, bulkButton, 'fa-solid fa-share-nodes');
+
+    if (ok) {
+        await markTicketsSent(selected.map((item) => item.ticketId));
+    }
+}
+
+function updateExportLink() {
+    const exportLink = document.getElementById('tickets-export-link');
+    const searchInput = document.getElementById('ticket-search-input');
+    const eventFilter = document.getElementById('ticket-event-filter');
+
+    if (!exportLink) return;
+
+    const basePath = exportLink.dataset.basePath;
+    const url = new URL(basePath, window.location.origin);
+
+    const q = (searchInput?.value || '').trim();
+    const eventName = (eventFilter?.value || '').trim();
+
+    if (q) url.searchParams.set('q', q);
+    if (eventName) url.searchParams.set('event', eventName);
+
+    exportLink.href = url.toString();
+}
+
+function setSearchLoading(isLoading) {
+    const tableContainer = document.querySelector('.table-container');
+
+    if (tableContainer) {
+        tableContainer.classList.toggle('search-loading', isLoading);
+    }
+}
+
+async function performTicketSearch() {
+    const searchForm = document.getElementById('ticket-search-form');
+    const searchInput = document.getElementById('ticket-search-input');
+    const eventFilter = document.getElementById('ticket-event-filter');
+    const tableContainer = document.querySelector('.table-container');
+
+    if (!searchForm || !searchInput || !eventFilter || !tableContainer) return;
+
+    const url = new URL(searchForm.action || window.location.pathname, window.location.origin);
+    const q = searchInput.value.trim();
+    const eventName = eventFilter.value.trim();
+
+    if (q) url.searchParams.set('q', q);
+    if (eventName) url.searchParams.set('event', eventName);
+
+    const wasFocused = document.activeElement === searchInput;
+    const selectionStart = searchInput.selectionStart;
+    const selectionEnd = searchInput.selectionEnd;
+    const currentValue = searchInput.value;
+
+    if (ticketSearchAbortController) {
+        ticketSearchAbortController.abort();
+    }
+
+    ticketSearchAbortController = new AbortController();
+    setSearchLoading(true);
+
+    try {
+        const response = await fetch(url.toString(), {
+            method: 'GET',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Cache-Control': 'no-cache'
+            },
+            cache: 'no-store',
+            signal: ticketSearchAbortController.signal
+        });
+
+        if (!response.ok) return;
+
+        const html = await response.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+
+        const freshTableContainer = doc.querySelector('.table-container');
+        if (!freshTableContainer) return;
+
+        tableContainer.innerHTML = freshTableContainer.innerHTML;
+
+        history.replaceState({}, '', url.pathname + url.search);
+
+        updateBulkShareState();
+        updateExportLink();
+        await syncVisibleSentMarks();
+
+        if (wasFocused) {
+            searchInput.focus();
+            if (searchInput.value === currentValue && selectionStart !== null && selectionEnd !== null) {
+                searchInput.setSelectionRange(selectionStart, selectionEnd);
+            }
+        }
+    } catch (error) {
+        if (error.name !== 'AbortError') {
+            console.error('Ошибка fetch-поиска билетов:', error);
+        }
+    } finally {
+        setSearchLoading(false);
+    }
+}
+
+function scheduleTicketSearch() {
+    clearTimeout(ticketSearchTimer);
+    ticketSearchTimer = setTimeout(() => {
+        performTicketSearch();
+    }, 400);
+}
+
+async function refreshTicketStatuses() {
+    if (document.hidden) return;
+
+    try {
+        const refreshUrl = new URL(window.location.href);
+        refreshUrl.searchParams.set('_ts', Date.now());
+
+        const response = await fetch(refreshUrl.toString(), {
+            method: 'GET',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Cache-Control': 'no-cache'
+            },
+            cache: 'no-store'
+        });
+
+        if (!response.ok) return;
+
+        const html = await response.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+
+        const freshRows = doc.querySelectorAll('tr[data-ticket-id]');
+        if (!freshRows.length) return;
+
+        const freshStatusMap = new Map();
+
+        freshRows.forEach((row) => {
+            const ticketId = row.dataset.ticketId;
+            const freshStatusTag = row.querySelector('.status-cell > .status-tag');
+
+            if (ticketId && freshStatusTag) {
+                freshStatusMap.set(ticketId, {
+                    text: freshStatusTag.textContent.trim(),
+                    className: freshStatusTag.className
+                });
+            }
+        });
+
+        document.querySelectorAll('tr[data-ticket-id]').forEach((row) => {
+            const ticketId = row.dataset.ticketId;
+            const currentStatusTag = row.querySelector('.status-cell > .status-tag');
+            const freshStatus = freshStatusMap.get(ticketId);
+
+            if (currentStatusTag && freshStatus) {
+                currentStatusTag.textContent = freshStatus.text;
+                currentStatusTag.className = freshStatus.className;
+            }
+        });
+
+        await syncVisibleSentMarks();
+    } catch (error) {
+        console.error('Ошибка обновления статусов билетов:', error);
+    }
+}
+
+function startTicketStatusRefresh() {
+    if (ticketStatusRefreshTimer || document.hidden) return;
+
+    ticketStatusRefreshTimer = setInterval(() => {
+        refreshTicketStatuses();
+    }, 5000);
+}
+
+function stopTicketStatusRefresh() {
+    if (!ticketStatusRefreshTimer) return;
+
+    clearInterval(ticketStatusRefreshTimer);
+    ticketStatusRefreshTimer = null;
+}
+
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+        stopTicketStatusRefresh();
+    } else {
+        refreshTicketStatuses();
+        startTicketStatusRefresh();
+    }
+});
+
+window.addEventListener('focus', () => {
+    refreshTicketStatuses();
+    startTicketStatusRefresh();
+});
+
+window.addEventListener('blur', () => {
+    stopTicketStatusRefresh();
+});
+
+document.addEventListener('click', (event) => {
+    const shareBtn = event.target.closest('.share-ticket-btn');
+    if (shareBtn) {
+        shareSingleTicket(shareBtn);
+        return;
+    }
+
+    const bulkButton = event.target.closest('#bulk-share-btn');
+    if (bulkButton) {
+        shareSelectedTickets();
+    }
+});
+
+document.addEventListener('change', (event) => {
+    if (event.target.matches('.bulk-ticket-checkbox')) {
+        updateBulkShareState();
+        return;
+    }
+
+    if (event.target.id === 'ticket-event-filter') {
+        performTicketSearch();
+    }
+});
+
+document.addEventListener('DOMContentLoaded', async () => {
+    const searchForm = document.getElementById('ticket-search-form');
+    const searchInput = document.getElementById('ticket-search-input');
+
+    if (searchForm) {
+        searchForm.addEventListener('submit', (event) => {
+            event.preventDefault();
+            performTicketSearch();
+        });
+    }
+
+    if (searchInput) {
+        searchInput.addEventListener('input', () => {
+            scheduleTicketSearch();
+        });
+    }
+
+    updateBulkShareState();
+    updateExportLink();
+    await syncVisibleSentMarks();
+    refreshTicketStatuses();
+    startTicketStatusRefresh();
+});
+</script>
+{% endblock %}

@@ -1,0 +1,301 @@
+{% extends "base.html" %}
+{% block content %}
+<script src="https://unpkg.com/@panzoom/panzoom@4.5.1/dist/panzoom.min.js"></script>
+
+<style>
+    .admin-panel { background: #fff; padding: 15px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); display: flex; flex-direction: column; height: calc(100vh - 100px); margin-top: 10px; box-sizing: border-box; }
+    .controls-header { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; }
+    .controls-header select { flex: 2; min-width: 200px; padding: 12px; border-radius: 8px; border: 2px solid #3498db; font-weight: bold; color: #2c3e50; }
+    .toggle-group { display: flex; gap: 5px; flex: 1; min-width: 200px; }
+    .toggle-group button { flex: 1; padding: 12px; border: none; border-radius: 8px; color: white; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 12px; }
+
+    .hall-map-wrapper { flex-grow: 1; position: relative; background: #fdfdfe; border-radius: 8px; border: 1px solid #e2e8f0; overflow: hidden; touch-action: none; }
+    .map-inner { display: inline-block; text-align: left; padding: 60px; transform-origin: center; }
+    .zoom-controls { position: absolute; right: 10px; bottom: 10px; display: flex; flex-direction: column; gap: 8px; z-index: 10; }
+    .zoom-btn { width: 44px; height: 44px; border-radius: 50%; border: none; background: #2c3e50; color: white; font-size: 20px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+
+    .row-line { display: flex; justify-content: center; align-items: center; margin-bottom: 10px; width: max-content; margin: 0 auto; }
+    .row-label { width: 35px; font-weight: bold; color: #d35400; font-size: 11px; text-align: center; border-right: 2px solid #ddd; margin-right: 8px; }
+    .seats-wrap { display: flex; flex-direction: row-reverse; gap: 4px; padding-right: 10px; }
+
+    .s-item { width: 24px; height: 24px; background: #2ecc71; color: white; border-radius: 4px; font-size: 10px; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1px solid rgba(0,0,0,0.1); box-sizing: border-box; }
+    .s-item.occupied { background: #e74c3c; opacity: 0.3; cursor: not-allowed; }
+    .s-item.selected { background: #3498db; transform: scale(1.15); box-shadow: 0 0 8px #3498db; border: 1px solid #fff; z-index: 2; }
+
+    .aisle { width: 20px; }
+    .empty-seat { width: 24px; height: 24px; background: transparent; pointer-events: none; border: 1px solid transparent; box-sizing: border-box; }
+
+    .sound-box-19 { position: absolute; width: calc(100% - 16px); height: 58px; background: #2c3e50; color: #ecf0f1; border-radius: 6px; display: flex; justify-content: center; align-items: center; font-size: 11px; font-weight: bold; letter-spacing: 1px; z-index: 5; pointer-events: none; top: 0; left: 8px; border: 2px solid #34495e; box-sizing: border-box; box-shadow: 0 4px 10px rgba(0,0,0,0.15); }
+
+    .section-title { text-align: center; font-weight: bold; padding: 8px; background: #eee; margin: 15px auto 5px; border-radius: 4px; width: max-content; min-width: 250px; color: #34495e; text-transform: uppercase; font-size: 12px; }
+
+    .boxes-container { display: flex; justify-content: center; gap: 15px; text-align: left; width: 100%; min-width: 650px; padding: 20px; }
+    .box-col { flex: 1; display: flex; flex-direction: column; gap: 10px; }
+    .box-card { background: #fff; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; display: flex; flex-direction: column; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.03); }
+    .box-title { font-size: 11px; font-weight: bold; text-align: center; margin-bottom: 8px; color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 4px; width: 90%; }
+    .box-seats { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; }
+
+    .action-bar { position: fixed; bottom: 85px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 600px; background: white; padding: 12px; border-radius: 12px; box-shadow: 0 -5px 25px rgba(0,0,0,0.2); display: none; z-index: 2000; border: 2px solid #3498db; }
+</style>
+
+<div class="admin-panel">
+    <div class="controls-header">
+        <form method="GET" style="flex: 2; margin: 0;">
+            <select name="event_filter" onchange="this.form.submit()">
+                <option value="">-- Выберите мероприятие --</option>
+                {% for ev in events_list %}
+                <option value="{{ ev.name }}" {% if current_event == ev.name %}selected{% endif %}>{{ ev.name }}</option>
+                {% endfor %}
+            </select>
+        </form>
+        <div class="toggle-group">
+            <button id="btn-hall" style="background:#2c3e50;" onclick="switchMode('hall')">ЗАЛ</button>
+            <button id="btn-boxes" style="background:#bdc3c7;" onclick="switchMode('boxes')">ЛОЖИ</button>
+        </div>
+    </div>
+
+    <div class="hall-map-wrapper" id="map-wrapper">
+        {% if current_event %}
+        <div id="map-root" class="map-inner"></div>
+        <div class="zoom-controls">
+            <button class="zoom-btn" onclick="zoomIn()">+</button>
+            <button class="zoom-btn" onclick="zoomOut()">-</button>
+            <button class="zoom-btn" onclick="resetZoom()">⟲</button>
+        </div>
+        {% else %}
+        <div style="margin-top: 50px; text-align: center; color: #7f8c8d; padding: 20px;">
+            <h3 style="color:#e74c3c;">Схема закрыта</h3><p>Выберите мероприятие сверху для начала работы.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% if current_event %}
+<div class="action-bar" id="action-bar">
+    <form method="POST" style="display:flex; gap:10px; align-items:center;">
+        <div style="background:#e8f4fd; padding:8px; border-radius:6px; font-weight:bold; color:#e67e22; min-width:30px; text-align:center;">
+            <span id="count-display">0</span>
+        </div>
+        <input type="hidden" name="seat" id="input-seat" required>
+        <input type="hidden" name="event" value="{{ current_event }}">
+        <input type="hidden" name="date" id="hidden-date">
+        <input type="text" name="name" placeholder="ФИО гостя" required style="flex:1; padding:10px; border:1px solid #ccc; border-radius:6px;">
+        <button type="submit" class="btn btn-success" style="padding:10px 15px;">ВЫДАТЬ</button>
+    </form>
+</div>
+{% endif %}
+
+<script>
+const occ = {{ occupied_seats|tojson|default('[]') }};
+
+const eventsData = {};
+{% for ev in events_list %}
+eventsData[{{ ev.name | tojson | safe }}] = {{ ev.event_date | tojson | safe }};
+{% endfor %}
+
+let selected = [];
+let currentMode = 'hall';
+let panzoomInstance = null;
+let startX, startY;
+
+function initPanzoom() {
+    const elem = document.getElementById('map-root');
+    if (!elem) return;
+    if (panzoomInstance) panzoomInstance.destroy();
+    panzoomInstance = Panzoom(elem, { maxScale: 3, minScale: 0.2, step: 0.2, contain: 'outside' });
+    elem.parentElement.addEventListener('wheel', panzoomInstance.zoomWithWheel, { passive: false });
+    setTimeout(() => { panzoomInstance.zoom(0.6, { animate: true }); panzoomInstance.pan(0, 0); }, 100);
+}
+
+function zoomIn() { if(panzoomInstance) panzoomInstance.zoomIn(); }
+function zoomOut() { if(panzoomInstance) panzoomInstance.zoomOut(); }
+function resetZoom() { if(panzoomInstance) { panzoomInstance.reset(); panzoomInstance.zoom(0.6); } }
+
+function drawMainHall() {
+    const root = document.getElementById('map-root'); if (!root) return; root.innerHTML = ''; root.className = 'map-inner';
+
+    const layout = [
+        {
+            name: 'ПАРТЕР', start: 1, end: 18,
+            func: (r) => {
+                if (r === 1) return { total: 18, aisle: 9 };
+                if (r === 2) return { total: 20, aisle: 10 };
+                if (r === 3) return { total: 22, aisle: 11 };
+                if (r === 4) return { total: 22, aisle: 11, gapAfter: true };
+                if (r === 5) return { total: 22, aisle: 11 };
+                return { total: 24, aisle: 12 };
+            }
+        },
+        {
+            name: 'АМФИТЕАТР', start: 19, end: 29,
+            func: (r) => {
+                if (r === 19) return { total: 21, aisle: 11, aisleWidth: '112px', insertAfterAisle: ['empty'], soundboardAmph19: true };
+                if (r === 20) return { total: 21, aisle: 11, aisleWidth: '112px', insertAfterAisle: ['empty'] };
+                if (r === 21) return { total: 22, aisle: 11, aisleWidth: '112px' };
+
+                if (r === 22) return { total: 26, aisle: null };
+                if (r >= 23 && r <= 25) return { total: 28, aisle: null };
+
+                if (r === 26) return { total: 25, aisle: null, gaps: { 7: 1, 18: 2 } };
+                if (r === 27 || r === 28) return { total: 26, aisle: null, gaps: { 7: 1, 19: 1 } };
+                if (r === 29) return { total: 19, aisle: null, gaps: { 5: 1, 17: 3 }, phantomRight: 2, phantomLeft: 3 };
+
+                return { total: 28, aisle: null };
+            }
+        },
+        {
+            name: 'БАЛКОН', start: 1, end: 5,
+            func: (r) => {
+                if (r === 5) return { total: 25, aisle: null };
+                return { total: 27, aisle: null };
+            }
+        }
+    ];
+
+    layout.forEach(sec => {
+        const h = document.createElement('div'); h.className = 'section-title'; h.innerText = sec.name; root.appendChild(h);
+        for (let r = sec.start; r <= sec.end; r++) {
+            const line = document.createElement('div'); line.className = 'row-line';
+            const rLab = document.createElement('div'); rLab.className = 'row-label'; rLab.innerText = r;
+            line.appendChild(rLab);
+            const wrap = document.createElement('div'); wrap.className = 'seats-wrap';
+
+            const conf = sec.func(r);
+            if (conf.gapAfter) line.style.marginBottom = '35px';
+
+            if (conf.phantomRight) {
+                for (let k = 0; k < conf.phantomRight; k++) {
+                    const el = document.createElement('div');
+                    el.className = 'empty-seat';
+                    wrap.appendChild(el);
+                }
+            }
+
+            for (let s = 1; s <= conf.total; s++) {
+                const sId = `${sec.name}, Ряд ${r}, Место ${s}`;
+                createSeat(wrap, sId, s);
+
+                if (conf.gaps && conf.gaps[s]) {
+                    for (let k = 0; k < conf.gaps[s]; k++) {
+                        const el = document.createElement('div');
+                        el.className = 'empty-seat';
+                        wrap.appendChild(el);
+                    }
+                }
+
+                if (conf.aisle === s) {
+                    const aisle = document.createElement('div');
+                    aisle.className = 'aisle';
+
+                    if (conf.aisleWidth) {
+                        aisle.style.width = conf.aisleWidth;
+                    }
+
+                    if (conf.soundboardAmph19) {
+                        aisle.style.position = 'relative';
+                        aisle.innerHTML = '<div class="sound-box-19">ЗВУК</div>';
+                    }
+
+                    wrap.appendChild(aisle);
+
+                    if (conf.insertAfterAisle) {
+                        conf.insertAfterAisle.forEach(item => {
+                            const el = document.createElement('div');
+                            el.className = item === 'empty' ? 'empty-seat' : 'pillar';
+                            wrap.appendChild(el);
+                        });
+                    }
+                }
+            }
+
+            if (conf.phantomLeft) {
+                for (let k = 0; k < conf.phantomLeft; k++) {
+                    const el = document.createElement('div');
+                    el.className = 'empty-seat';
+                    wrap.appendChild(el);
+                }
+            }
+
+            line.appendChild(wrap); root.appendChild(line);
+        }
+    }); initPanzoom();
+}
+
+function drawBoxes() {
+    const root = document.getElementById('map-root'); if (!root) return; root.innerHTML = ''; root.className = 'boxes-container';
+    const layoutBoxes = {
+        left: [
+            { id: 'Ложа Админ', label: 'АДМИНИСТРАТИВНАЯ', count: 10, start: 1 },
+            { id: 'Ложа 6 (Л)', label: 'ЛОЖА 6 (Левая)', count: 4, start: 1 },
+            { id: 'Ложа 5 (Л)', label: 'ЛОЖА 5 (Левая)', count: 4, start: 1 },
+            { id: 'Ложа 4 (Л)', label: 'ЛОЖА 4 (Левая)', count: 4, start: 1 },
+            { id: 'Ложа 3 (Л)', label: 'ЛОЖА 3 (Левая)', count: 4, start: 1 },
+            { id: 'Ложа 2 (Л)', label: 'ЛОЖА 2 (Левая)', count: 4, start: 1 },
+            { id: 'Ложа 1 (Л)', label: 'ЛОЖА 1 (Левая)', count: 4, start: 1 },
+            { id: 'Балкон (Л)', label: 'БАЛКОН (Левая)', count: 3, start: 4 }
+        ],
+        right: [
+            { id: 'Ложа Директора', label: 'ДИРЕКТОРА (Правая)', count: 10, start: 1 },
+            { id: 'Ложа 6 (П)', label: 'ЛОЖА 6 (Правая)', count: 4, start: 1 },
+            { id: 'Ложа 5 (П)', label: 'ЛОЖА 5 (ЗВУКОВАЯ)', count: 0, start: 1, tech: true },
+            { id: 'Ложа 4 (П)', label: 'ЛОЖА 4 (Правая)', count: 4, start: 1 },
+            { id: 'Ложа 3 (П)', label: 'ЛОЖА 3 (Правая)', count: 4, start: 1 },
+            { id: 'Ложа 2 (П)', label: 'ЛОЖА 2 (Правая)', count: 4, start: 1 },
+            { id: 'Ложа 1 (П)', label: 'ЛОЖА 1 (Правая)', count: 4, start: 1 },
+            { id: 'Балкон (П)', label: 'БАЛКОН (Правая)', count: 3, start: 1 }
+        ]
+    };
+    function buildCol(data, alignContainer) {
+        const col = document.createElement('div'); col.className = 'box-col';
+        data.forEach(box => {
+            const card = document.createElement('div'); card.className = 'box-card';
+            const title = document.createElement('div'); title.className = 'box-title'; title.innerText = box.label;
+            if (box.tech) { title.style.color = '#e74c3c'; card.appendChild(title); }
+            else {
+                card.appendChild(title); const sWrap = document.createElement('div'); sWrap.className = 'box-seats';
+                for (let i = 0; i < box.count; i++) {
+                    const sId = `${box.id}, Место ${box.start + i}`; createSeat(sWrap, sId, box.start + i);
+                }
+                card.appendChild(sWrap);
+            }
+            col.appendChild(card);
+        }); alignContainer.appendChild(col);
+    }
+    buildCol(layoutBoxes.left, root); buildCol(layoutBoxes.right, root); initPanzoom();
+}
+
+function createSeat(container, sId, textVal) {
+    const seat = document.createElement('div'); seat.className = 's-item'; seat.innerText = textVal;
+    if (occ.includes(sId)) { seat.classList.add('occupied'); }
+    else {
+        if (selected.includes(sId)) seat.classList.add('selected');
+        seat.addEventListener('pointerdown', (e) => { startX = e.clientX; startY = e.clientY; });
+        seat.addEventListener('pointerup', (e) => {
+            if (Math.abs(e.clientX - startX) < 5 && Math.abs(e.clientY - startY) < 5) {
+                if (selected.includes(sId)) { selected = selected.filter(x => x!==sId); seat.classList.remove('selected'); }
+                else { selected.push(sId); seat.classList.add('selected'); }
+                update();
+            }
+        });
+    }
+    container.appendChild(seat);
+}
+
+function update() {
+    const bar = document.getElementById('action-bar'); if (!bar) return;
+    document.getElementById('input-seat').value = selected.join('|');
+    document.getElementById('count-display').innerText = selected.length;
+    bar.style.display = selected.length > 0 ? 'block' : 'none';
+    if (eventsData["{{ current_event }}"]) document.getElementById('hidden-date').value = eventsData["{{ current_event }}"];
+}
+
+function switchMode(mode) {
+    currentMode = mode;
+    document.getElementById('btn-hall').style.background = mode === 'hall' ? '#2c3e50' : '#bdc3c7';
+    document.getElementById('btn-boxes').style.background = mode === 'boxes' ? '#2c3e50' : '#bdc3c7';
+    if (mode === 'hall') drawMainHall(); else drawBoxes();
+}
+
+if (document.getElementById('map-root')) { switchMode('hall'); }
+</script>
+{% endblock %}
