@@ -67,8 +67,9 @@ def _ticket_vm(ticket):
         status=_ticket_status_value(ticket),
         status_label=_ticket_status_label(ticket),
         used_at=ticket.used_at.isoformat() if ticket.used_at else "",
+        sent_at=ticket.sent_at.strftime("%d.%m.%Y %H:%M") if ticket.sent_at else "",
         date=_date_to_str(ticket.event.event_date if ticket.event else None),
-        qr_path=ticket.qr_path,
+        qr_path=ticket.qr_path, 
     )
 
 def _event_vm(event):
