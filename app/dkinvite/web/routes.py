@@ -112,6 +112,11 @@ def index():
 
 @bp.route("/login", methods=["GET", "POST"])
 def login():
+    if session.get("logged_in") and session.get("user_id"):
+        if session.get("role") == "admin":
+            return redirect(url_for("web.admin"))
+        return redirect(url_for("web.scan"))
+    
     if request.method == "POST":
         username = (request.form.get("username") or "").strip()
         password = request.form.get("password") or ""

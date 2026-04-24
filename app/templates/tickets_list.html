@@ -174,7 +174,7 @@
                 type="text"
                 name="q"
                 placeholder="Поиск по имени..."
-                value="{{ search_q }}"
+                value=""
                 autocomplete="off"
                 style="flex:1; min-width:150px; padding:12px; border-radius:10px; border:1px solid #e2e8f0;"
             >
@@ -563,6 +563,9 @@ function updateExportLink() {
     const q = (searchInput?.value || '').trim();
     const eventName = (eventFilter?.value || '').trim();
 
+    url.searchParams.delete('q');
+    url.searchParams.delete('event');
+
     if (q) url.searchParams.set('q', q);
     if (eventName) url.searchParams.set('event', eventName);
 
@@ -588,6 +591,9 @@ async function performTicketSearch() {
     const url = new URL(searchForm.action || window.location.pathname, window.location.origin);
     const q = searchInput.value.trim();
     const eventName = eventFilter.value.trim();
+    
+    url.searchParams.delete('q');
+    url.searchParams.delete('event');
 
     if (q) url.searchParams.set('q', q);
     if (eventName) url.searchParams.set('event', eventName);
